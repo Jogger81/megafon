@@ -18,6 +18,7 @@ def createParser():
     parser.add_argument('-m', '--model', dest="model", default='model.sav')
     parser.add_argument('-t', '--test', dest="data_test", default='data_test.csv')
     parser.add_argument('-f', '--features', dest="data_features", default='features.csv')
+    parser.add_argument('-d', '--destination', dest="destination", default='answers_test.csv')
     parser.add_argument('-d', '--directory', dest="filepath", default='./')
     return parser
 
@@ -41,22 +42,34 @@ if __name__ == '__main__':
     parser = createParser()
     namespace = parser.parse_args(sys.argv[1:])
 
+    print('-'*5+'Полученные параметры'+'-'*5)
     print('model = '+namespace.model)
     print('test file = '+namespace.data_test)
     print('features file = '+namespace.data_features)
     print('file path = '+namespace.filepath)
+    print('destination = '+namespace.destination)
+    print('-' * 29)
 
-    print('Обработка Data_test')
+    print('Обработка Data_test 1/7')
     data_test = dd.read_csv(namespace.filepath+namespace.data_test).drop(columns=['Unnamed: 0'])
     data_test = data_test.sort_values(['id']).reset_index().drop(columns=['index'])
-    print('Обработка features')
+
+    print('Обработка features 2/7')
     df = dd.read_csv(namespace.filepath+namespace.data_features, delimiter="\t").drop(columns=['Unnamed: 0'])
     df = df.sort_values(['id']).reset_index().drop(columns=['index'])
-    print('Data_test join features')
+
+    print('Data_test join with features 3/7')
     X_test = data_test.join(df, on="id", rsuffix='_other').compute()
-    print('Загружаем модель')
+
+    print('Загружаем модель 4/7')
     loaded_model = pickle.load(open(namespace.filepath+namespace.model, 'rb'))
-    print('Получаем предсказание')
+
+    print('Получаем предсказание 5/7')
     model_pred = loaded_model.predict_proba(X_test)
 
-    print(model_pred)
+    print('Получаем предсказание 6/7')
+    X_test = X_test[['buy_time', 'id', 'vas_id']]
+    X_test['target'] = model_pred[:, 1]
+
+    print('Получаем предсказание 7/7')
+    X_test.to_csv(namespace.filepath+namespace.destination)
