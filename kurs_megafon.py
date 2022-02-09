@@ -1,45 +1,62 @@
 import pandas as pd
 import dask.dataframe as dd
 import numpy as np
+import pickle
 
 import sys
 import argparse
 
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.feature_selection import SelectFromModel
+from sklearn.pipeline import FeatureUnion, make_pipeline
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.impute import SimpleImputer
+from sklearn.base import BaseEstimator, TransformerMixin
 
 def createParser():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-m', '--model', dest="model", required=True)
-    parser.add_argument('-t', '--test', dest="data_test", required=True)
+    parser.add_argument('-m', '--model', dest="model", default='model.sav')
+    parser.add_argument('-t', '--test', dest="data_test", default='data_test.csv')
+    parser.add_argument('-f', '--features', dest="data_features", default='features.csv')
     parser.add_argument('-d', '--directory', dest="filepath", default='./')
     return parser
 
+class ColumnSelector(BaseEstimator, TransformerMixin):
+    def __init__(self, columns):
+        self.columns = columns
+
+    def fit(self, X, y=None):
+        return self
+
+    def transform(self, X):
+        assert isinstance(X, pd.DataFrame)
+
+        try:
+            return X[self.columns]
+        except KeyError:
+            cols_error = list(set(self.columns) - set(X.columns))
+            raise KeyError("DataFrame не содердит следующие колонки: %s" % cols_error)
 
 if __name__ == '__main__':
     parser = createParser()
     namespace = parser.parse_args(sys.argv[1:])
 
-    print(namespace)
+    print('model = '+namespace.model)
+    print('test file = '+namespace.data_test)
+    print('features file = '+namespace.data_features)
+    print('file path = '+namespace.filepath)
 
-    for name in namespace.name.split():
-        print("Привет, {}!".format(name))
+    print('Обработка Data_test')
+    data_test = dd.read_csv(namespace.filepath+namespace.data_test).drop(columns=['Unnamed: 0'])
+    data_test = data_test.sort_values(['id']).reset_index().drop(columns=['index'])
+    print('Обработка features')
+    df = dd.read_csv(namespace.filepath+namespace.data_features, delimiter="\t").drop(columns=['Unnamed: 0'])
+    df = df.sort_values(['id']).reset_index().drop(columns=['index'])
+    print('Data_test join features')
+    X_test = data_test.join(df, on="id", rsuffix='_other').compute()
+    print('Загружаем модель')
+    loaded_model = pickle.load(open(namespace.filepath+namespace.model, 'rb'))
+    print('Получаем предсказание')
+    model_pred = loaded_model.predict_proba(X_test)
 
-
-
-
-    data_test = dd.read_csv('data_train.csv')
-    data_train = data_train.set_index('Unnamed: 0')
-    data_train.to_hdf('file.hdf5', key='table')
-    data_train = data_train.sort_values('id')
-    print(data_train.shape)
-    print(data_train.head())
-
-    df = dd.read_csv('features.csv', delimiter="\t")
-    df = df.set_index('Unnamed: 0')
-    df = df.sort_values('id')
-    df.to_hdf('file.hdf5', key='table')
-    print(df.head())
-
-    data = dd.multi.merge_asof(data_train, df, on="buy_time", by="id")
-    data.to_csv('data_with_features.csv')
-
-    print(data.head(3))
+    print(model_pred)
