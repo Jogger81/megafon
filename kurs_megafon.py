@@ -13,6 +13,15 @@ from sklearn.preprocessing import StandardScaler, OneHotEncoder
 from sklearn.impute import SimpleImputer
 from sklearn.base import BaseEstimator, TransformerMixin
 
+# параметры командной строки:
+# -m    имя файла сохраненной модели (по умолчанию model.sav)
+# -t    имя файла для классификации (по умолчанию data_test.sav)
+# -f    имя файла features (по умолчанию features.sav)
+# -dest имя файла для сохранения результатоа (по умолчанию answers_test.sav)
+# -d    рабочая директория (по умолчанию текущая)
+#
+
+
 def createParser():
     parser = argparse.ArgumentParser()
     parser.add_argument('-m', '--model', dest="model", default='model.sav')
